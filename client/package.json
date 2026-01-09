@@ -21,7 +21,7 @@
     "eject": "react-scripts eject"
   },
   "devDependencies": {
-    "react-scripts": "^5.0.1"
+    "react-scripts": "^0.0.0"
   },
   "eslintConfig": {
     "extends": [
