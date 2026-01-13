@@ -149,6 +149,7 @@ function Dashboard() {
   );
 
   const formatCurrency = (value) => {
+    if (value == null || isNaN(value)) return '$0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: accountData?.currency || 'USD',
@@ -319,7 +320,7 @@ function Dashboard() {
                   <Box display="flex" justifyContent="space-between" py={1.5} borderBottom="1px solid rgba(255, 255, 255, 0.08)">
                     <Typography sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Total Profit %:</Typography>
                     <Typography fontWeight={600} sx={{ color: accountData.totalProfitPercent >= 0 ? '#4caf50' : '#f44336' }}>
-                      {accountData.totalProfitPercent >= 0 ? '+' : ''}{accountData.totalProfitPercent.toFixed(2)}%
+                      {accountData.totalProfitPercent >= 0 ? '+' : ''}{formatPercent(accountData.totalProfitPercent)}%
                     </Typography>
                   </Box>
                   <Box display="flex" justifyContent="space-between" py={1.5} borderBottom="1px solid rgba(255, 255, 255, 0.08)">
@@ -519,7 +520,7 @@ function Dashboard() {
                                   sx={{ display: { xs: 'none', sm: 'table-cell' } }}
                                 >
                                   <Chip
-                                    label={`${position.unrealizedPnlPercent >= 0 ? '+' : ''}${position.unrealizedPnlPercent.toFixed(2)}%`}
+                                    label={`${position.unrealizedPnlPercent >= 0 ? '+' : ''}${formatPercent(position.unrealizedPnlPercent)}%`}
                                     color={position.unrealizedPnlPercent >= 0 ? 'success' : 'error'}
                                     size="small"
                                     sx={{ fontWeight: 600 }}
