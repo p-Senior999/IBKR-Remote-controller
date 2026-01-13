@@ -2,8 +2,8 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const base_url = "https://mensural-unbravely-malcolm.ngrok-free.dev"
+const API_BASE_URL = base_url + '/api';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -20,11 +20,13 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check if user is logged in on mount
-    if (token) {
-      verifyToken(token);
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      verifyToken(storedToken);
     } else {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const verifyToken = async (authToken) => {
@@ -50,6 +52,7 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
       });
+      console.log("--------------------------------------------->response",response);
       const { token, user } = response.data;
       setToken(token);
       setUser(user);
