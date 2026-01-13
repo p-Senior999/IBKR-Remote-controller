@@ -948,7 +948,7 @@ function BotManagement() {
                       fontSize: { xs: '1rem', sm: '1.25rem' },
                     }}
                   >
-                    Pending Position
+                    Position Status
                   </Typography>
                   <TableContainer>
                     <Table size="small">
@@ -991,33 +991,45 @@ function BotManagement() {
                           <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
                             {pendingPosition.timeInForce}
                           </TableCell>
-                          <TableCell sx={{ minWidth: 140 }}>
-                            <FormControl fullWidth size="small">
-                              <Select
-                                value={pendingPosition.status}
-                                onChange={(e) => handlePendingStatusChange(e.target.value)}
-                                sx={{
-                                  color: '#FFFFFF',
-                                  '& .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: 'rgba(255, 255, 255, 0.23)',
-                                  },
-                                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: 'rgba(255, 255, 255, 0.4)',
-                                  },
-                                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                    borderColor: '#FFFFFF',
-                                  },
-                                  '& .MuiSvgIcon-root': {
-                                    color: 'rgba(255, 255, 255, 0.7)',
-                                  },
-                                }}
-                              >
-                                <MenuItem value="PENDING">Pending</MenuItem>
-                                <MenuItem value="ACTIVE">Active</MenuItem>
-                                <MenuItem value="CANCELLED">Cancelled</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </TableCell>
+                        <TableCell sx={{ minWidth: 140 }}>
+                          <Button
+                            variant={
+                              pendingPosition.status === 'PENDING'
+                                ? 'outlined'
+                                : 'contained'
+                            }
+                            color={
+                              pendingPosition.status === 'PENDING'
+                                ? 'info'
+                                : pendingPosition.status === 'ACTIVE'
+                                ? 'success'
+                                : 'error'
+                            }
+                            disabled={pendingPosition.status === 'CANCELLED' || loading}
+                            onClick={() => {
+                              let nextStatus = 'PENDING';
+                              if (pendingPosition.status === 'PENDING') {
+                                nextStatus = 'ACTIVE';
+                              } else if (pendingPosition.status === 'ACTIVE') {
+                                nextStatus = 'CANCELLED';
+                              } else {
+                                nextStatus = 'CANCELLED';
+                              }
+                              handlePendingStatusChange(nextStatus);
+                            }}
+                            sx={{
+                              fontWeight: 600,
+                              px: 2.5,
+                              textTransform: 'none',
+                            }}
+                          >
+                            {pendingPosition.status === 'PENDING'
+                              ? 'Pending'
+                              : pendingPosition.status === 'ACTIVE'
+                              ? 'Active'
+                              : 'Cancelled'}
+                          </Button>
+                        </TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
