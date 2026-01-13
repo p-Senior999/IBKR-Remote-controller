@@ -3,7 +3,7 @@ import axios from 'axios';
 import { config } from '../config';
 const AuthContext = createContext();
 const API_BASE_URL = config.Main_Endpoint + '/api';
-
+console.log("--------------------------------------------->API_BASE_URL",API_BASE_URL);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
