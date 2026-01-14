@@ -40,7 +40,7 @@ function BotManagement() {
   const [positions, setPositions] = useState([]);
   const [positionsLoading, setPositionsLoading] = useState(false);
   const [accountData, setAccountData] = useState(null);
-  const [pendingPosition, setPendingPosition] = useState(null);
+  const [tradingHistory, setTradingHistory] = useState([]);
   const [formData, setFormData] = useState({
     symbol: '',
     stopLoss: 'EntryBar',
@@ -84,30 +84,47 @@ function BotManagement() {
     },
   });
 
-  // Load pending position from localStorage on mount
+  // Helper function to get today's date string (YYYY-MM-DD)
+  const getTodayDateString = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  // Load trading history from localStorage on mount (only today's records)
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('pendingPosition');
+      const today = getTodayDateString();
+      const stored = localStorage.getItem(`tradingHistory_${today}`);
       if (stored) {
-        setPendingPosition(JSON.parse(stored));
+        const history = JSON.parse(stored);
+        setTradingHistory(Array.isArray(history) ? history : []);
+      } else {
+        // Clear old history from previous days
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('tradingHistory_') && key !== `tradingHistory_${today}`) {
+            localStorage.removeItem(key);
+          }
+        });
       }
     } catch (e) {
-      console.error('Error loading pending position from localStorage:', e);
+      console.error('Error loading trading history from localStorage:', e);
     }
   }, []);
 
-  // Persist pending position to localStorage whenever it changes
+  // Persist trading history to localStorage whenever it changes (only today's records)
   useEffect(() => {
     try {
-      if (pendingPosition) {
-        localStorage.setItem('pendingPosition', JSON.stringify(pendingPosition));
+      const today = getTodayDateString();
+      if (tradingHistory.length > 0) {
+        localStorage.setItem(`tradingHistory_${today}`, JSON.stringify(tradingHistory));
       } else {
-        localStorage.removeItem('pendingPosition');
+        localStorage.removeItem(`tradingHistory_${today}`);
       }
     } catch (e) {
-      console.error('Error saving pending position to localStorage:', e);
+      console.error('Error saving trading history to localStorage:', e);
     }
-  }, [pendingPosition]);
+  }, [tradingHistory]);
 
   useEffect(() => {
     if (token) {
@@ -294,23 +311,29 @@ function BotManagement() {
         return;
       }
 
+      // Create new order entry with unique ID and timestamp
+      const payload = buildApiPayload();
+      const newOrder = {
+        id: Date.now(), // Unique ID for each order
+        timestamp: new Date().toISOString(),
+        ...payload,
+        status: formData.status,
+        // Store raw values for display
+        customStopLossValue:
+          formData.stopLoss === 'Custom' ? customStopLossValue || null : null,
+        conditionalOrder:
+          formData.tradeType === 'Conditional Order' ? conditionalOrder : null,
+        limitPrice:
+          formData.tradeType === 'Limit Order' ? limitPrice || null : null,
+        entryPrice:
+          formData.tradeType === 'Custom' ? entryPrice || null :
+          formData.tradeType === 'Limit Order' ? limitPrice || null : null,
+      };
+
       // If status is PENDING, do NOT send to bot yet – just store locally
       if (formData.status === 'PENDING') {
-        const payload = buildApiPayload();
-        setPendingPosition({
-          ...payload,
-          status: formData.status,
-          // Store raw values for display
-          customStopLossValue:
-            formData.stopLoss === 'Custom' ? customStopLossValue || null : null,
-          conditionalOrder:
-            formData.tradeType === 'Conditional Order' ? conditionalOrder : null,
-          limitPrice:
-            formData.tradeType === 'Limit Order' ? limitPrice || null : null,
-          entryPrice:
-            formData.tradeType === 'Custom' ? entryPrice || null :
-            formData.tradeType === 'Limit Order' ? limitPrice || null : null,
-        });
+        // Add to trading history array
+        setTradingHistory((prev) => [...prev, newOrder]);
       } else {
         // For ACTIVE / CANCELLED, send immediately to bot
         const submitData = buildApiPayload();
@@ -324,22 +347,8 @@ function BotManagement() {
         setStatusMessage('✅ Position sent to bot successfully!');
         setTimeout(() => setStatusMessage(''), 5000);
 
-        // Store last sent position for display
-        const payload = buildApiPayload();
-        setPendingPosition({
-          ...payload,
-          status: formData.status,
-          // Store raw values for display
-          customStopLossValue:
-            formData.stopLoss === 'Custom' ? customStopLossValue || null : null,
-          conditionalOrder:
-            formData.tradeType === 'Conditional Order' ? conditionalOrder : null,
-          limitPrice:
-            formData.tradeType === 'Limit Order' ? limitPrice || null : null,
-          entryPrice:
-            formData.tradeType === 'Custom' ? entryPrice || null :
-            formData.tradeType === 'Limit Order' ? limitPrice || null : null,
-        });
+        // Add to trading history array
+        setTradingHistory((prev) => [...prev, newOrder]);
       }
 
       // Reset form
@@ -390,12 +399,20 @@ function BotManagement() {
   };
 
   // When user changes status in the pending row, only send to bot when not PENDING
-  const handlePendingStatusChange = async (newStatus) => {
-    if (!pendingPosition) return;
+  const handlePendingStatusChange = async (orderId, newStatus) => {
+    // Find the order in trading history
+    const orderIndex = tradingHistory.findIndex(order => order.id === orderId);
+    if (orderIndex === -1) return;
+
+    const order = tradingHistory[orderIndex];
 
     // Update UI immediately
-    const updated = { ...pendingPosition, status: newStatus };
-    setPendingPosition(updated);
+    const updated = { ...order, status: newStatus };
+    setTradingHistory((prev) => {
+      const newHistory = [...prev];
+      newHistory[orderIndex] = updated;
+      return newHistory;
+    });
 
     // If still pending, do not send anything to bot
     if (newStatus === 'PENDING') return;
@@ -403,7 +420,7 @@ function BotManagement() {
     try {
       setLoading(true);
 
-      // Reconstruct payload from stored pendingPosition
+      // Reconstruct payload from stored order
       const submitData = {
         symbol: updated.symbol,
         tradeType: updated.tradeType,
@@ -1108,117 +1125,134 @@ function BotManagement() {
             </Card>
           </Grid>
         )}
-        {positions.length === 0 && !positionsLoading && (
+        {/* Trading History - Always show if there are any orders */}
+        {tradingHistory.length > 0 && (
           <Grid item xs={12}>
-            {pendingPosition ? (
-              <Card
-                elevation={0}
-                sx={{
-                  background: '#121212',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: 2,
-                }}
-              >
-                <CardContent>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 600,
-                      mb: 2,
-                      color: '#FFFFFF',
-                      fontSize: { xs: '1rem', sm: '1.25rem' },
-                    }}
-                  >
-                    Position Status
-                  </Typography>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow
-                          sx={{
-                            '& .MuiTableCell-head': {
-                              color: '#FFFFFF',
-                              fontWeight: 600,
-                              borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
-                            },
-                          }}
-                        >
-                          <TableCell>Symbol</TableCell>
-                          <TableCell>Trade Type</TableCell>
-                          <TableCell>Stop Loss</TableCell>
-                          <TableCell>Take Profit</TableCell>
-                          <TableCell>Time Frame</TableCell>
-                          <TableCell>Time In Force</TableCell>
-                          <TableCell>Status</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell sx={{ color: 'white', fontWeight: 600 }}>
-                            {pendingPosition.symbol}
-                          </TableCell>
-                          <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                            {pendingPosition.tradeType}
-                          </TableCell>
-                          <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                            {pendingPosition.stopLoss}
-                          </TableCell>
-                          <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                            {pendingPosition.takeProfit}
-                          </TableCell>
-                          <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                            {pendingPosition.timeFrame}
-                          </TableCell>
-                          <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                            {pendingPosition.timeInForce}
-                          </TableCell>
-                        <TableCell sx={{ minWidth: 140 }}>
-                          <Button
-                            variant={
-                              pendingPosition.status === 'PENDING'
-                                ? 'outlined'
-                                : 'contained'
-                            }
-                            color={
-                              pendingPosition.status === 'PENDING'
-                                ? 'info'
-                                : pendingPosition.status === 'ACTIVE'
-                                ? 'success'
-                                : 'error'
-                            }
-                            disabled={pendingPosition.status === 'CANCELLED' || loading}
-                            onClick={() => {
-                              let nextStatus = 'PENDING';
-                              if (pendingPosition.status === 'PENDING') {
-                                nextStatus = 'ACTIVE';
-                              } else if (pendingPosition.status === 'ACTIVE') {
-                                nextStatus = 'CANCELLED';
-                              } else {
-                                nextStatus = 'CANCELLED';
-                              }
-                              handlePendingStatusChange(nextStatus);
-                            }}
-                            sx={{
-                              fontWeight: 600,
-                              px: 2.5,
-                              textTransform: 'none',
-                            }}
-                          >
-                            {pendingPosition.status === 'PENDING'
-                              ? 'Pending'
-                              : pendingPosition.status === 'ACTIVE'
-                              ? 'Active'
-                              : 'Cancelled'}
-                          </Button>
-                        </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card
+            <Card
+              elevation={0}
+              sx={{
+                background: '#121212',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: 2,
+              }}
+            >
+              <CardContent>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 600,
+                    mb: 2,
+                    color: '#FFFFFF',
+                    fontSize: { xs: '1rem', sm: '1.25rem' },
+                  }}
+                >
+                  Position Status ({tradingHistory.length})
+                </Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow
+                        sx={{
+                          '& .MuiTableCell-head': {
+                            color: '#FFFFFF',
+                            fontWeight: 600,
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+                          },
+                        }}
+                      >
+                        <TableCell>Time</TableCell>
+                        <TableCell>Symbol</TableCell>
+                        <TableCell>Trade Type</TableCell>
+                        <TableCell>Stop Loss</TableCell>
+                        <TableCell>Take Profit</TableCell>
+                        <TableCell>Time Frame</TableCell>
+                        <TableCell>Time In Force</TableCell>
+                        <TableCell>Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {[...tradingHistory].sort((a, b) => b.id - a.id).map((order) => {
+                        const orderTime = new Date(order.timestamp);
+                        const timeString = orderTime.toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        });
+                        return (
+                          <TableRow key={order.id}>
+                            <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem' }}>
+                              {timeString}
+                            </TableCell>
+                            <TableCell sx={{ color: 'white', fontWeight: 600 }}>
+                              {order.symbol}
+                            </TableCell>
+                            <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                              {order.tradeType}
+                            </TableCell>
+                            <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                              {order.stopLoss}
+                            </TableCell>
+                            <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                              {order.takeProfit}
+                            </TableCell>
+                            <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                              {order.timeFrame}
+                            </TableCell>
+                            <TableCell sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                              {order.timeInForce}
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 140 }}>
+                              <Button
+                                variant={
+                                  order.status === 'PENDING'
+                                    ? 'outlined'
+                                    : 'contained'
+                                }
+                                color={
+                                  order.status === 'PENDING'
+                                    ? 'info'
+                                    : order.status === 'ACTIVE'
+                                    ? 'success'
+                                    : 'error'
+                                }
+                                disabled={order.status === 'CANCELLED' || loading}
+                                onClick={() => {
+                                  let nextStatus = 'PENDING';
+                                  if (order.status === 'PENDING') {
+                                    nextStatus = 'ACTIVE';
+                                  } else if (order.status === 'ACTIVE') {
+                                    nextStatus = 'CANCELLED';
+                                  } else {
+                                    nextStatus = 'CANCELLED';
+                                  }
+                                  handlePendingStatusChange(order.id, nextStatus);
+                                }}
+                                sx={{
+                                  fontWeight: 600,
+                                  px: 2.5,
+                                  textTransform: 'none',
+                                }}
+                              >
+                                {order.status === 'PENDING'
+                                  ? 'Pending'
+                                  : order.status === 'ACTIVE'
+                                  ? 'Active'
+                                  : 'Cancelled'}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+        {positions.length === 0 && !positionsLoading && tradingHistory.length === 0 && (
+          <Grid item xs={12}>
+            <Card
                 elevation={0}
                 sx={{
                   background: '#121212',
@@ -1239,7 +1273,6 @@ function BotManagement() {
                   </Typography>
                 </CardContent>
               </Card>
-            )}
           </Grid>
         )}
       </Grid>
