@@ -20,7 +20,6 @@ import {
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
-import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -42,7 +41,6 @@ function Layout({ children }) {
   const menuItems = [
     { text: 'Account Status', icon: <HomeIcon />, path: '/' },
     { text: 'Bot Management', icon: <PlayArrowIcon />, path: '/bot' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ];
 
   const handleMenuOpen = (event) => {
