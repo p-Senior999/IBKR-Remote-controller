@@ -39,6 +39,7 @@ function TradeHistoryModal({ open, onClose, currency = 'USD', date = null }) {
     if (open) {
       fetchTradeHistory();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, date]);
 
   const fetchTradeHistory = async () => {

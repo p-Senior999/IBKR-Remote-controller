@@ -43,6 +43,7 @@ function OpenPositionsModal({ open, onClose, currency = 'USD' }) {
     if (open) {
       fetchOpenPositions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const fetchOpenPositions = async () => {

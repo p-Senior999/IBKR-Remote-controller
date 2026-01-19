@@ -130,6 +130,7 @@ function BotManagement() {
       // Fetch positions once when Bot Management mounts or token changes
       fetchPositions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // Show modal when Trade Type is "Custom" for entryPrice
@@ -252,7 +253,7 @@ function BotManagement() {
     setStatusMessage('');
 
     try {
-      const response = await axios.post(
+      await axios.post(
         `${API_BASE_URL}/bot/close-all-positions`,
         {},
         getAuthHeaders()

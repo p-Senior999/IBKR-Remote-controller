@@ -15,8 +15,6 @@ import {
   IconButton,
   Tooltip,
   Chip,
-  Button,
-  Alert,
 } from '@mui/material';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -54,6 +52,7 @@ function Dashboard() {
       // Only fetch on mount, not auto-refresh
       fetchAccountData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fetchAccountData = async () => {
