@@ -1,4 +1,4 @@
-# Trading Bot Manager : Project ID : P-729
+# Trading Bot Manager
 
 A beautiful, user-friendly web interface for controlling your Python trading bot. This full-stack application provides an intuitive dashboard to start, stop, and monitor your bot with a modern Material-UI design.
 
